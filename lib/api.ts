@@ -1,4 +1,4 @@
-import type { SidebarData, LessonDetail } from "@/types/lesson";
+import type { SidebarData, LessonDetail, TargetWord } from "@/types/lesson";
 import type { GameStartRequest, GameFinishRequest } from "@/types/game";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -23,3 +23,23 @@ export const startGame = (body: GameStartRequest): Promise<{ session_id: string 
 
 export const finishGame = (body: GameFinishRequest): Promise<{ ok: boolean }> =>
   apiFetch("/games/finish", { method: "POST", body: JSON.stringify(body) });
+
+export interface GenerateResponse {
+  title: string;
+  text_source: string;
+  target_data: TargetWord[];
+}
+
+export const generateLesson = (germanText: string, prompt: string): Promise<GenerateResponse> =>
+  apiFetch("/lessons/generate", {
+    method: "POST",
+    body: JSON.stringify({ german_text: germanText, prompt }),
+  });
+
+export const createLesson = (body: {
+  title: string;
+  text_source: string;
+  target_data: TargetWord[];
+  folder_id?: string;
+}): Promise<LessonDetail> =>
+  apiFetch("/lessons", { method: "POST", body: JSON.stringify(body) });

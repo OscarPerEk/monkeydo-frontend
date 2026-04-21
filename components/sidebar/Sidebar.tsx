@@ -9,9 +9,10 @@ import LessonItem from "./LessonItem";
 interface Props {
   activeId: string | null;
   onSelect: (id: string) => void;
+  onCreateClick: () => void;
 }
 
-export default function Sidebar({ activeId, onSelect }: Props) {
+export default function Sidebar({ activeId, onSelect, onCreateClick }: Props) {
   const [data, setData] = useState<SidebarData | null>(null);
 
   useEffect(() => {
@@ -20,8 +21,15 @@ export default function Sidebar({ activeId, onSelect }: Props) {
 
   return (
     <aside className="w-56 min-w-56 h-full flex flex-col bg-zinc-900 border-r border-zinc-800 overflow-y-auto">
-      <div className="px-3 py-4 text-lg font-bold tracking-tight text-white">
-        monkeydo
+      <div className="px-3 py-4 flex items-center justify-between">
+        <span className="text-lg font-bold tracking-tight text-white">monkeydo</span>
+        <button
+          onClick={onCreateClick}
+          className="text-zinc-500 hover:text-white text-xl leading-none transition-colors"
+          title="Create lesson"
+        >
+          +
+        </button>
       </div>
       <nav className="flex-1 flex flex-col gap-1 px-1 pb-4">
         {data ? (

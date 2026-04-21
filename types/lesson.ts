@@ -1,7 +1,6 @@
 export interface TargetWord {
   index: number;
   sentence_index: number;
-  source_word_index: number;
   word: string;
 }
 
