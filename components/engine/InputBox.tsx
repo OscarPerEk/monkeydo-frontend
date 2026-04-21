@@ -78,12 +78,12 @@ export default function InputBox({
       onChange={handleChange}
       onKeyDown={handleKeyDown}
       disabled={disabled}
-      placeholder="type here…"
+      placeholder=""
       autoComplete="off"
       autoCorrect="off"
       autoCapitalize="off"
       spellCheck={false}
-      className={`bg-transparent border-b-2 outline-none text-white text-base w-48 pb-0.5 transition-colors ${borderColor} placeholder-zinc-700 disabled:opacity-30`}
+      className={`bg-transparent border-b-2 outline-none text-white text-base w-48 pb-0.5 text-center transition-colors ${borderColor} placeholder-zinc-700 disabled:opacity-30`}
     />
   );
 }

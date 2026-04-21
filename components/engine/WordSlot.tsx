@@ -16,12 +16,33 @@ export default function WordSlot({ word, state, typedWord }: Props) {
     );
   }
 
-  const isExact = state === "revealed-correct";
-  const textColor = isExact ? "text-emerald-400" : "text-yellow-400";
+  if (state === "revealed-correct") {
+    return (
+      <span className="text-sm leading-5 text-emerald-400">
+        {typedWord ?? word.word}
+      </span>
+    );
+  }
+
+  // Partial match: show correct prefix in yellow, remaining chars in red
+  const target = word.word;
+  const typed = typedWord ?? "";
+  const tLower = typed.toLowerCase();
+  const wLower = target.toLowerCase();
+
+  // Find shared prefix length
+  let prefixLen = 0;
+  while (prefixLen < tLower.length && prefixLen < wLower.length && tLower[prefixLen] === wLower[prefixLen]) {
+    prefixLen++;
+  }
+
+  const correctPart = target.slice(0, prefixLen);
+  const missingPart = target.slice(prefixLen);
 
   return (
-    <span className={`text-sm leading-5 ${textColor}`}>
-      {typedWord ?? word.word}
+    <span className="text-sm leading-5">
+      <span className="text-yellow-400">{correctPart}</span>
+      <span className="text-red-400">{missingPart}</span>
     </span>
   );
 }

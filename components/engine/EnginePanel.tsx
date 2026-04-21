@@ -99,7 +99,7 @@ export default function EnginePanel({ lessonId }: Props) {
 
   const handleFirstKey = useCallback(
     (char: string) => {
-      if (gameState === "pre-game") {
+      if (gameState === "idle" || gameState === "pre-game") {
         handleStart(durationSeconds, difficulty);
       }
     },
@@ -162,18 +162,37 @@ export default function EnginePanel({ lessonId }: Props) {
     });
   }, [lesson, gameState, unguessed]);
 
-  // Advance sentence when all words in current row are revealed
+  // Advance sentence when all words in current row are revealed (3s delay)
+  const [sentencePause, setSentencePause] = useState(false);
+
   useEffect(() => {
     if (gameState !== "playing" || currentSentenceWords.length === 0) return;
     const allDone = currentSentenceWords.every(
       (w) => slots.get(w.index)?.state !== "hidden"
     );
     if (allDone) {
-      if (sentenceIdx + 1 < sentences.length) {
-        setSentenceIdx((i) => i + 1);
-      } else {
-        handleFinish();
-      }
+      setSentencePause(true);
+      clearInterval(timerRef.current!);
+      const timeout = setTimeout(() => {
+        setSentencePause(false);
+        // restart timer
+        timerRef.current = setInterval(() => {
+          setSecondsLeft((s) => {
+            if (s <= 1) {
+              clearInterval(timerRef.current!);
+              handleFinish();
+              return 0;
+            }
+            return s - 1;
+          });
+        }, 1000);
+        if (sentenceIdx + 1 < sentences.length) {
+          setSentenceIdx((i) => i + 1);
+        } else {
+          handleFinish();
+        }
+      }, 3000);
+      return () => clearTimeout(timeout);
     }
   }, [slots]);
 
@@ -242,7 +261,7 @@ export default function EnginePanel({ lessonId }: Props) {
           onSkipRow={handleSkipRow}
           onFirstKey={() => {}}
           started={true}
-          disabled={false}
+          disabled={sentencePause}
         />
       )}
     </div>

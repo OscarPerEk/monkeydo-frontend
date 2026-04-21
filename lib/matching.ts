@@ -1,44 +1,50 @@
 import type { TargetWord } from "@/types/lesson";
 
 /**
- * A word is accepted when the typed input is a correct prefix of the target
- * AND covers ≥50% of that word's length.
+ * Returns the length of the shared prefix between two strings (case-insensitive).
  */
-function isPrefixMatch(input: string, candidate: string): boolean {
-  const i = input.toLowerCase();
-  const c = candidate.toLowerCase();
-  return c.startsWith(i) && i.length / c.length >= 0.5;
+function sharedPrefixLength(a: string, b: string): number {
+  const al = a.toLowerCase();
+  const bl = b.toLowerCase();
+  let i = 0;
+  while (i < al.length && i < bl.length && al[i] === bl[i]) i++;
+  return i;
 }
 
 export interface MatchResult {
   word: TargetWord;
-  /** true = exact match (green), false = prefix match (yellow) */
+  /** true = exact match (green), false = partial match (yellow) */
   exact: boolean;
 }
 
 /**
  * Finds the best unguessed word slot for the typed input.
  * Order-free: checks all unguessed slots.
- * Returns the slot with highest prefix coverage (≥50%). Leftmost wins on tie.
+ *
+ * Matching rules:
+ * - Exact match (case-insensitive): green
+ * - Shared prefix covers ≥50% of the target word: yellow
+ * - Best coverage wins, leftmost on tie
  */
 export function findBestMatch(
   input: string,
   unguessed: TargetWord[]
 ): MatchResult | null {
-  // Exact match takes priority
+  // Exact match takes priority (case-insensitive)
   for (const word of unguessed) {
     if (input.toLowerCase() === word.word.toLowerCase()) {
       return { word, exact: true };
     }
   }
 
-  // Prefix match: highest coverage wins, leftmost on tie
+  // Partial match: shared prefix must cover ≥50% of target word
   let best: MatchResult | null = null;
   let bestRatio = 0;
 
   for (const word of unguessed) {
-    const ratio = input.length / word.word.length;
-    if (isPrefixMatch(input, word.word) && ratio > bestRatio) {
+    const prefixLen = sharedPrefixLength(input, word.word);
+    const ratio = prefixLen / word.word.length;
+    if (ratio >= 0.5 && ratio > bestRatio) {
       best = { word, exact: false };
       bestRatio = ratio;
     }
