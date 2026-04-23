@@ -6,18 +6,22 @@ interface Props {
   onSubmit: (value: string) => boolean; // returns true if accepted
   onSkipWord: () => void;
   onSkipRow: () => void;
+  onRequestHint: () => void;
   onFirstKey: (char: string) => void;
   started: boolean;
   disabled: boolean;
+  hint: string | null;
 }
 
 export default function InputBox({
   onSubmit,
   onSkipWord,
   onSkipRow,
+  onRequestHint,
   onFirstKey,
   started,
   disabled,
+  hint,
 }: Props) {
   const [value, setValue] = useState("");
   const [flash, setFlash] = useState<"red" | null>(null);
@@ -49,7 +53,11 @@ export default function InputBox({
     if (e.key === " " || e.key === "Enter") {
       e.preventDefault();
       const trimmed = value.trim();
-      if (!trimmed) return;
+      if (!trimmed) {
+        // Empty input → request next hint
+        if (started) onRequestHint();
+        return;
+      }
       const accepted = onSubmit(trimmed);
       if (accepted) {
         setValue("");
@@ -71,19 +79,24 @@ export default function InputBox({
   const borderColor = flash === "red" ? "border-red-500" : "border-zinc-700 focus:border-zinc-500";
 
   return (
-    <input
-      ref={inputRef}
-      type="text"
-      value={value}
-      onChange={handleChange}
-      onKeyDown={handleKeyDown}
-      disabled={disabled}
-      placeholder=""
-      autoComplete="off"
-      autoCorrect="off"
-      autoCapitalize="off"
-      spellCheck={false}
-      className={`bg-transparent border-b-2 outline-none text-white text-base w-48 pb-0.5 text-center transition-colors ${borderColor} placeholder-zinc-700 disabled:opacity-30`}
-    />
+    <div className="flex flex-col items-center gap-2">
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        disabled={disabled}
+        placeholder=""
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        className={`bg-transparent border-b-2 outline-none text-white text-base w-48 pb-0.5 text-center transition-colors ${borderColor} placeholder-zinc-700 disabled:opacity-30`}
+      />
+      {hint && (
+        <span className="text-zinc-500 text-sm">{hint}</span>
+      )}
+    </div>
   );
 }

@@ -26,11 +26,12 @@ export default function EnginePanel({ lessonId }: Props) {
   const [lesson, setLesson] = useState<LessonDetail | null>(null);
   const [gameState, setGameState] = useState<GameState>("idle");
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("hard");
   const [durationSeconds, setDurationSeconds] = useState(300);
   const [secondsLeft, setSecondsLeft] = useState(300);
   const [sentenceIdx, setSentenceIdx] = useState(0);
   const [slots, setSlots] = useState<Map<number, SlotMeta>>(new Map());
+  const [wrongAttempts, setWrongAttempts] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const historyRef = useRef<WordHistoryEntry[]>([]);
 
@@ -41,7 +42,7 @@ export default function EnginePanel({ lessonId }: Props) {
     historyRef.current = [];
     getLesson(lessonId).then((l) => {
       setLesson(l);
-      setSlots(buildInitialSlots(l.target_data, "medium"));
+      setSlots(buildInitialSlots(l.target_data));
       setSentenceIdx(0);
     });
   }, [lessonId]);
@@ -92,7 +93,7 @@ export default function EnginePanel({ lessonId }: Props) {
       setSessionId(session_id);
       setGameState("playing");
       // rebuild slots with difficulty pre-fill
-      setSlots(buildInitialSlots(lesson.target_data, diff, historyRef));
+      setSlots(buildInitialSlots(lesson.target_data));
     },
     [lesson, lessonId]
   );
@@ -110,7 +111,39 @@ export default function EnginePanel({ lessonId }: Props) {
     (input: string): boolean => {
       if (!lesson || gameState !== "playing") return false;
       const match = findBestMatch(input, unguessed);
-      if (!match) return false;
+      if (!match) {
+        // Wrong answer — increment hints
+        const nextWrong = wrongAttempts + 1;
+        setWrongAttempts(nextWrong);
+
+        // Check if hint now reveals the full word → auto-reveal as failed
+        const targetWord = unguessed[0];
+        if (targetWord) {
+          const hintLen = getHintLength(targetWord.word, difficulty, nextWrong);
+          if (hintLen >= targetWord.word.length) {
+            setSlots((prev) => {
+              const next = new Map(prev);
+              next.set(targetWord.index, {
+                state: "revealed-failed",
+                typedWord: null,
+                attempts: nextWrong,
+                startedAt: null,
+                latencyMs: null,
+              });
+              return next;
+            });
+            historyRef.current.push({
+              word_index: targetWord.index,
+              typed_word: input,
+              status: "wrong",
+              attempts: nextWrong,
+              latency_ms: 0,
+            });
+            setWrongAttempts(0);
+          }
+        }
+        return false;
+      }
 
       const prev = slots.get(match.word.index) ?? defaultSlot();
       const latencyMs = prev.startedAt ? Date.now() - prev.startedAt : null;
@@ -136,9 +169,10 @@ export default function EnginePanel({ lessonId }: Props) {
         return next;
       });
 
+      setWrongAttempts(0);
       return true;
     },
-    [lesson, gameState, unguessed, slots]
+    [lesson, gameState, unguessed, slots, wrongAttempts, difficulty]
   );
 
   const handleSkipWord = useCallback(() => {
@@ -149,6 +183,7 @@ export default function EnginePanel({ lessonId }: Props) {
       next.set(word.index, { state: "revealed-correct", typedWord: word.word, attempts: 0, startedAt: null, latencyMs: null });
       return next;
     });
+    setWrongAttempts(0);
   }, [lesson, gameState, unguessed]);
 
   const handleSkipRow = useCallback(() => {
@@ -160,7 +195,38 @@ export default function EnginePanel({ lessonId }: Props) {
       }
       return next;
     });
+    setWrongAttempts(0);
   }, [lesson, gameState, unguessed]);
+
+  const handleRequestHint = useCallback(() => {
+    if (!lesson || gameState !== "playing" || unguessed.length === 0) return;
+    const nextWrong = wrongAttempts + 1;
+    setWrongAttempts(nextWrong);
+
+    const targetWord = unguessed[0];
+    const hintLen = getHintLength(targetWord.word, difficulty, nextWrong);
+    if (hintLen >= targetWord.word.length) {
+      setSlots((prev) => {
+        const next = new Map(prev);
+        next.set(targetWord.index, {
+          state: "revealed-failed",
+          typedWord: null,
+          attempts: nextWrong,
+          startedAt: null,
+          latencyMs: null,
+        });
+        return next;
+      });
+      historyRef.current.push({
+        word_index: targetWord.index,
+        typed_word: "",
+        status: "wrong",
+        attempts: nextWrong,
+        latency_ms: 0,
+      });
+      setWrongAttempts(0);
+    }
+  }, [lesson, gameState, unguessed, wrongAttempts, difficulty]);
 
   // Advance sentence when all words in current row are revealed (3s delay)
   const [sentencePause, setSentencePause] = useState(false);
@@ -249,9 +315,11 @@ export default function EnginePanel({ lessonId }: Props) {
             onSubmit={() => false}
             onSkipWord={() => {}}
             onSkipRow={() => {}}
+            onRequestHint={() => {}}
             onFirstKey={handleFirstKey}
             started={false}
             disabled={false}
+            hint={null}
           />
         </div>
       ) : (
@@ -259,9 +327,11 @@ export default function EnginePanel({ lessonId }: Props) {
           onSubmit={handleSubmit}
           onSkipWord={handleSkipWord}
           onSkipRow={handleSkipRow}
+          onRequestHint={handleRequestHint}
           onFirstKey={() => {}}
           started={true}
           disabled={sentencePause}
+          hint={getHint(unguessed[0], difficulty, wrongAttempts)}
         />
       )}
     </div>
@@ -274,26 +344,10 @@ function defaultSlot(): SlotMeta {
   return { state: "hidden", typedWord: null, attempts: 0, startedAt: Date.now(), latencyMs: null };
 }
 
-function buildInitialSlots(
-  words: TargetWord[],
-  difficulty: "easy" | "medium" | "hard",
-  historyRef?: React.MutableRefObject<WordHistoryEntry[]>
-): Map<number, SlotMeta> {
+function buildInitialSlots(words: TargetWord[]): Map<number, SlotMeta> {
   const map = new Map<number, SlotMeta>();
-  const prefillCount = difficulty === "easy" ? Math.floor(words.length * 0.33) : 0;
-
-  const indices = [...Array(words.length).keys()];
-  const prefilled = new Set(
-    [...indices].sort(() => Math.random() - 0.5).slice(0, prefillCount)
-  );
-
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    if (prefilled.has(i)) {
-      map.set(word.index, { state: "revealed-correct", typedWord: word.word, attempts: 0, startedAt: null, latencyMs: null });
-    } else {
-      map.set(word.index, defaultSlot());
-    }
+  for (const word of words) {
+    map.set(word.index, defaultSlot());
   }
   return map;
 }
@@ -314,4 +368,28 @@ function splitSourceSentences(text: string): string[] {
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+function getHintLength(
+  word: string,
+  difficulty: "easy" | "medium" | "hard",
+  wrongCount: number
+): number {
+  if (wrongCount === 0) return 0;
+  let base: number;
+  if (difficulty === "easy") base = word.length;
+  else if (difficulty === "medium") base = Math.ceil(word.length / 2);
+  else base = 1;
+  return Math.min(base + (wrongCount - 1), word.length);
+}
+
+function getHint(
+  word: TargetWord | undefined,
+  difficulty: "easy" | "medium" | "hard",
+  wrongCount: number
+): string | null {
+  if (!word || wrongCount === 0) return null;
+  const len = getHintLength(word.word, difficulty, wrongCount);
+  if (len >= word.word.length) return word.word;
+  return word.word.slice(0, len) + "…";
 }

@@ -24,6 +24,14 @@ export default function WordSlot({ word, state, typedWord }: Props) {
     );
   }
 
+  if (state === "revealed-failed") {
+    return (
+      <span className="text-sm leading-5 text-red-400">
+        {word.word}
+      </span>
+    );
+  }
+
   // Partial match: show correct prefix in yellow, remaining chars in red
   const target = word.word;
   const typed = typedWord ?? "";
