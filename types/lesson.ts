@@ -2,6 +2,7 @@ export interface TargetWord {
   index: number;
   sentence_index: number;
   word: string;
+  excluded?: boolean;
 }
 
 export interface LessonDetail {

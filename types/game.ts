@@ -1,6 +1,6 @@
 export type WordStatus = "correct" | "ok" | "wrong";
 
-export type SlotState = "hidden" | "revealed-correct" | "revealed-ok" | "revealed-failed";
+export type SlotState = "hidden" | "revealed-correct" | "revealed-ok" | "revealed-failed" | "revealed-excluded";
 
 export interface WordHistoryEntry {
   word_index: number;

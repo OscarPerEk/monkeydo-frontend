@@ -347,7 +347,11 @@ function defaultSlot(): SlotMeta {
 function buildInitialSlots(words: TargetWord[]): Map<number, SlotMeta> {
   const map = new Map<number, SlotMeta>();
   for (const word of words) {
-    map.set(word.index, defaultSlot());
+    if (word.excluded) {
+      map.set(word.index, { state: "revealed-excluded", typedWord: word.word, attempts: 0, startedAt: null, latencyMs: null });
+    } else {
+      map.set(word.index, defaultSlot());
+    }
   }
   return map;
 }
