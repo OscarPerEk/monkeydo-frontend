@@ -365,7 +365,7 @@ function groupBySentence(words: TargetWord[]): TargetWord[][] {
 
 function splitSourceSentences(text: string): string[] {
   return text
-    .split(/(?<=[.!?])\s+/)
+    .split("|")
     .map((s) => s.trim())
     .filter(Boolean);
 }
