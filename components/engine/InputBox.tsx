@@ -7,9 +7,10 @@ interface Props {
   onSkipWord: () => void;
   onSkipRow: () => void;
   onRequestHint: () => void;
+  onSkipPause: () => void; // skip the 3s pause between sentences
   onFirstKey: (char: string) => void;
   started: boolean;
-  disabled: boolean;
+  disabled: boolean; // true during sentence pause
   hint: string | null;
 }
 
@@ -18,6 +19,7 @@ export default function InputBox({
   onSkipWord,
   onSkipRow,
   onRequestHint,
+  onSkipPause,
   onFirstKey,
   started,
   disabled,
@@ -37,7 +39,12 @@ export default function InputBox({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (disabled) return;
+    // Any key during pause → skip to next sentence
+    if (disabled) {
+      e.preventDefault();
+      onSkipPause();
+      return;
+    }
 
     if (e.key === "Tab") {
       e.preventDefault();
@@ -50,11 +57,29 @@ export default function InputBox({
       return;
     }
 
-    if (e.key === " " || e.key === "Enter") {
+    if (e.key === "Enter") {
       e.preventDefault();
       const trimmed = value.trim();
       if (!trimmed) {
-        // Empty input → request next hint
+        // Empty Enter → skip entire sentence (red)
+        if (started) onSkipRow();
+        return;
+      }
+      const accepted = onSubmit(trimmed);
+      if (accepted) {
+        setValue("");
+      } else {
+        triggerRed();
+        setValue("");
+      }
+      return;
+    }
+
+    if (e.key === " ") {
+      e.preventDefault();
+      const trimmed = value.trim();
+      if (!trimmed) {
+        // Empty Space → request next hint
         if (started) onRequestHint();
         return;
       }
@@ -86,13 +111,13 @@ export default function InputBox({
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        disabled={disabled}
+        disabled={false}
         placeholder=""
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
-        className={`bg-transparent border-b-2 outline-none text-white text-base w-48 pb-0.5 text-center transition-colors ${borderColor} placeholder-zinc-700 disabled:opacity-30`}
+        className={`bg-transparent border-b-2 outline-none text-white text-base w-48 pb-0.5 text-center transition-colors ${borderColor} placeholder-zinc-700 ${disabled ? "opacity-30" : ""}`}
       />
       {hint && (
         <span className="text-zinc-500 text-sm">{hint}</span>

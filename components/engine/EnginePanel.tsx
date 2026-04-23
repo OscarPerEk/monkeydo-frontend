@@ -161,7 +161,7 @@ export default function EnginePanel({ lessonId }: Props) {
         const next = new Map(prev);
         next.set(match.word.index, {
           state: newState,
-          typedWord: input,
+          typedWord: match.word.word,
           attempts: (prev.get(match.word.index)?.attempts ?? 0) + 1,
           startedAt: null,
           latencyMs,
@@ -191,7 +191,7 @@ export default function EnginePanel({ lessonId }: Props) {
     setSlots((prev) => {
       const next = new Map(prev);
       for (const word of unguessed) {
-        next.set(word.index, { state: "revealed-correct", typedWord: word.word, attempts: 0, startedAt: null, latencyMs: null });
+        next.set(word.index, { state: "revealed-failed", typedWord: null, attempts: 0, startedAt: null, latencyMs: null });
       }
       return next;
     });
@@ -228,8 +228,39 @@ export default function EnginePanel({ lessonId }: Props) {
     }
   }, [lesson, gameState, unguessed, wrongAttempts, difficulty]);
 
-  // Advance sentence when all words in current row are revealed (3s delay)
+  const handleFinish = useCallback(async () => {
+    if (gameState === "finished") return;
+    setGameState("finished");
+    clearInterval(timerRef.current!);
+    if (sessionId) {
+      await finishGame({ session_id: sessionId, word_history: historyRef.current });
+    }
+  }, [gameState, sessionId]);
+
+  // Advance sentence when all words in current row are revealed (3s delay, skippable)
   const [sentencePause, setSentencePause] = useState(false);
+  const pauseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const advanceToNextSentence = useCallback(() => {
+    if (pauseTimeoutRef.current) clearTimeout(pauseTimeoutRef.current);
+    setSentencePause(false);
+    // restart timer
+    timerRef.current = setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) {
+          clearInterval(timerRef.current!);
+          handleFinish();
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    if (sentenceIdx + 1 < sentences.length) {
+      setSentenceIdx((i) => i + 1);
+    } else {
+      handleFinish();
+    }
+  }, [sentenceIdx, sentences.length, handleFinish]);
 
   useEffect(() => {
     if (gameState !== "playing" || currentSentenceWords.length === 0) return;
@@ -239,37 +270,12 @@ export default function EnginePanel({ lessonId }: Props) {
     if (allDone) {
       setSentencePause(true);
       clearInterval(timerRef.current!);
-      const timeout = setTimeout(() => {
-        setSentencePause(false);
-        // restart timer
-        timerRef.current = setInterval(() => {
-          setSecondsLeft((s) => {
-            if (s <= 1) {
-              clearInterval(timerRef.current!);
-              handleFinish();
-              return 0;
-            }
-            return s - 1;
-          });
-        }, 1000);
-        if (sentenceIdx + 1 < sentences.length) {
-          setSentenceIdx((i) => i + 1);
-        } else {
-          handleFinish();
-        }
-      }, 3000);
-      return () => clearTimeout(timeout);
+      pauseTimeoutRef.current = setTimeout(advanceToNextSentence, 3000);
+      return () => {
+        if (pauseTimeoutRef.current) clearTimeout(pauseTimeoutRef.current);
+      };
     }
   }, [slots]);
-
-  const handleFinish = useCallback(async () => {
-    if (gameState === "finished") return;
-    setGameState("finished");
-    clearInterval(timerRef.current!);
-    if (sessionId) {
-      await finishGame({ session_id: sessionId, word_history: historyRef.current });
-    }
-  }, [gameState, sessionId]);
 
   if (!lesson) {
     return (
@@ -316,6 +322,7 @@ export default function EnginePanel({ lessonId }: Props) {
             onSkipWord={() => {}}
             onSkipRow={() => {}}
             onRequestHint={() => {}}
+            onSkipPause={() => {}}
             onFirstKey={handleFirstKey}
             started={false}
             disabled={false}
@@ -328,6 +335,7 @@ export default function EnginePanel({ lessonId }: Props) {
           onSkipWord={handleSkipWord}
           onSkipRow={handleSkipRow}
           onRequestHint={handleRequestHint}
+          onSkipPause={advanceToNextSentence}
           onFirstKey={() => {}}
           started={true}
           disabled={sentencePause}

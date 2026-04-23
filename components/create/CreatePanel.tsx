@@ -8,7 +8,7 @@ interface Props {
   onSaved: (lessonId: string) => void;
 }
 
-const ESTIMATED_SECONDS = 30;
+const ESTIMATED_SECONDS = 40;
 
 export default function CreatePanel({ onSaved }: Props) {
   const [germanText, setGermanText] = useState("");
