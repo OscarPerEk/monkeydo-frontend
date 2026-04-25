@@ -10,6 +10,8 @@ export interface LessonDetail {
   title: string;
   text_source: string;
   target_data: TargetWord[];
+  range_start_index: number | null;
+  range_end_index: number | null;
 }
 
 export interface LessonSummary {

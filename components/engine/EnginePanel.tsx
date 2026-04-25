@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getLesson, startGame, finishGame } from "@/lib/api";
 import { findBestMatch, hasViableMatch } from "@/lib/matching";
 import type { LessonDetail, TargetWord } from "@/types/lesson";
@@ -23,6 +24,7 @@ interface SlotMeta {
 }
 
 export default function EnginePanel({ lessonId }: Props) {
+  const router = useRouter();
   const [lesson, setLesson] = useState<LessonDetail | null>(null);
   const [gameState, setGameState] = useState<GameState>("idle");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -42,8 +44,14 @@ export default function EnginePanel({ lessonId }: Props) {
     historyRef.current = [];
     getLesson(lessonId).then((l) => {
       setLesson(l);
-      setSlots(buildInitialSlots(l.target_data));
-      setSentenceIdx(0);
+      const initialSlots = buildInitialSlots(l.target_data, l.range_start_index, l.range_end_index);
+      setSlots(initialSlots);
+      // Start at the first sentence that has hidden (playable) words
+      const groups = groupBySentence(l.target_data);
+      const firstPlayable = groups.findIndex((words) =>
+        words.some((w) => initialSlots.get(w.index)?.state === "hidden"),
+      );
+      setSentenceIdx(firstPlayable >= 0 ? firstPlayable : 0);
     });
   }, [lessonId]);
 
@@ -93,7 +101,14 @@ export default function EnginePanel({ lessonId }: Props) {
       setSessionId(session_id);
       setGameState("playing");
       // rebuild slots with difficulty pre-fill
-      setSlots(buildInitialSlots(lesson.target_data));
+      const newSlots = buildInitialSlots(lesson.target_data, lesson.range_start_index, lesson.range_end_index);
+      setSlots(newSlots);
+      // Jump to first playable sentence
+      const groups = groupBySentence(lesson.target_data);
+      const firstPlayable = groups.findIndex((words) =>
+        words.some((w) => newSlots.get(w.index)?.state === "hidden"),
+      );
+      setSentenceIdx(firstPlayable >= 0 ? firstPlayable : 0);
     },
     [lesson, lessonId]
   );
@@ -188,6 +203,15 @@ export default function EnginePanel({ lessonId }: Props) {
 
   const handleSkipRow = useCallback(() => {
     if (!lesson || gameState !== "playing") return;
+    for (const word of unguessed) {
+      historyRef.current.push({
+        word_index: word.index,
+        typed_word: "",
+        status: "skipped",
+        attempts: 0,
+        latency_ms: 0,
+      });
+    }
     setSlots((prev) => {
       const next = new Map(prev);
       for (const word of unguessed) {
@@ -242,8 +266,11 @@ export default function EnginePanel({ lessonId }: Props) {
     clearInterval(timerRef.current!);
     if (sessionId) {
       await finishGame({ session_id: sessionId, word_history: historyRef.current });
+      setTimeout(() => {
+        router.push(`/lessons/${lessonId}/results?session=${sessionId}`);
+      }, 3000);
     }
-  }, [gameState, sessionId]);
+  }, [gameState, sessionId, lessonId, router]);
 
   // Advance sentence when all words in current row are revealed (3s delay, skippable)
   const [sentencePause, setSentencePause] = useState(false);
@@ -263,12 +290,21 @@ export default function EnginePanel({ lessonId }: Props) {
         return s - 1;
       });
     }, 1000);
-    if (sentenceIdx + 1 < sentences.length) {
-      setSentenceIdx((i) => i + 1);
+    // Find next sentence with hidden (playable) words
+    let nextIdx = sentenceIdx + 1;
+    while (nextIdx < sentences.length) {
+      const hasHidden = sentences[nextIdx].some(
+        (w) => slots.get(w.index)?.state === "hidden",
+      );
+      if (hasHidden) break;
+      nextIdx++;
+    }
+    if (nextIdx < sentences.length) {
+      setSentenceIdx(nextIdx);
     } else {
       handleFinish();
     }
-  }, [sentenceIdx, sentences.length, handleFinish]);
+  }, [sentenceIdx, sentences, slots, handleFinish]);
 
   useEffect(() => {
     if (gameState !== "playing" || currentSentenceWords.length === 0) return;
@@ -294,7 +330,17 @@ export default function EnginePanel({ lessonId }: Props) {
   }
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-8 px-16 py-12 max-w-3xl mx-auto w-full">
+    <div className="flex-1 flex flex-col items-center justify-center gap-8 px-16 py-12 max-w-3xl mx-auto w-full relative">
+      {/* Analytics link (pre-game only) */}
+      {(gameState === "idle" || gameState === "pre-game") && (
+        <button
+          onClick={() => router.push(`/lessons/${lessonId}/results`)}
+          className="absolute top-4 right-4 px-3 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-white text-sm transition-colors border border-zinc-700 hover:border-zinc-500"
+        >
+          Edit
+        </button>
+      )}
+
       {/* Timer */}
       {gameState === "playing" && (
         <div className="w-full">
@@ -321,7 +367,7 @@ export default function EnginePanel({ lessonId }: Props) {
 
       {/* Input / pre-game / finished */}
       {gameState === "finished" ? (
-        <p className="text-zinc-500 text-sm">session saved.</p>
+        <p className="text-zinc-500 text-sm animate-pulse">Ergebnisse laden…</p>
       ) : gameState === "idle" || gameState === "pre-game" ? (
         <div className="flex flex-col items-center gap-6">
           <PreGame onStart={handleStart} />
@@ -362,10 +408,16 @@ function defaultSlot(): SlotMeta {
   return { state: "hidden", typedWord: null, attempts: 0, startedAt: Date.now(), latencyMs: null };
 }
 
-function buildInitialSlots(words: TargetWord[]): Map<number, SlotMeta> {
+function buildInitialSlots(
+  words: TargetWord[],
+  rangeStart?: number | null,
+  rangeEnd?: number | null,
+): Map<number, SlotMeta> {
+  const hasRange = rangeStart != null && rangeEnd != null;
   const map = new Map<number, SlotMeta>();
   for (const word of words) {
-    if (word.excluded) {
+    const outsideRange = hasRange && (word.index < rangeStart || word.index > rangeEnd);
+    if (word.excluded || outsideRange) {
       map.set(word.index, { state: "revealed-excluded", typedWord: word.word, attempts: 0, startedAt: null, latencyMs: null });
     } else {
       map.set(word.index, defaultSlot());

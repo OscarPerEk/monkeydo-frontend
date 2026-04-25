@@ -1,4 +1,4 @@
-export type WordStatus = "correct" | "ok" | "wrong";
+export type WordStatus = "correct" | "ok" | "wrong" | "skipped";
 
 export type SlotState = "hidden" | "revealed-correct" | "revealed-ok" | "revealed-failed" | "revealed-excluded";
 
@@ -22,3 +22,18 @@ export interface GameFinishRequest {
 }
 
 export type GameState = "idle" | "pre-game" | "playing" | "finished";
+
+export interface GameSessionSummary {
+  id: string;
+  difficulty: string | null;
+  duration_seconds: number | null;
+  created_at: string;
+}
+
+export interface WordHistoryOut {
+  word_index: number;
+  typed_word: string;
+  status: WordStatus;
+  attempts: number;
+  latency_ms: number;
+}

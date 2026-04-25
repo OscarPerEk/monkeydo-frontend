@@ -1,30 +1,38 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { getSidebar } from "@/lib/api";
 import type { SidebarData } from "@/types/lesson";
 import FolderItem from "./FolderItem";
 import LessonItem from "./LessonItem";
 
-interface Props {
-  activeId: string | null;
-  onSelect: (id: string) => void;
-  onCreateClick: () => void;
-}
-
-export default function Sidebar({ activeId, onSelect, onCreateClick }: Props) {
+export default function Sidebar() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [data, setData] = useState<SidebarData | null>(null);
+
+  // Derive activeId from pathname: /lessons/<id> → id
+  const match = pathname.match(/^\/lessons\/([^/]+)/);
+  const activeId = match ? match[1] : null;
 
   useEffect(() => {
     getSidebar().then(setData).catch(console.error);
   }, []);
+
+  // Refetch sidebar data when navigating away from /create (i.e. after saving)
+  useEffect(() => {
+    if (pathname !== "/create") {
+      getSidebar().then(setData).catch(console.error);
+    }
+  }, [pathname]);
 
   return (
     <aside className="w-56 min-w-56 h-full flex flex-col bg-zinc-900 border-r border-zinc-800 overflow-y-auto">
       <div className="px-3 py-4 flex items-center justify-between">
         <span className="text-lg font-bold tracking-tight text-white">monkeydo</span>
         <button
-          onClick={onCreateClick}
+          onClick={() => router.push("/create")}
           className="text-zinc-500 hover:text-white text-xl leading-none transition-colors"
           title="Create lesson"
         >
@@ -39,7 +47,6 @@ export default function Sidebar({ activeId, onSelect, onCreateClick }: Props) {
                 key={folder.id}
                 folder={folder}
                 activeId={activeId}
-                onSelect={onSelect}
               />
             ))}
             {data.root_lessons.length > 0 && (
@@ -49,7 +56,6 @@ export default function Sidebar({ activeId, onSelect, onCreateClick }: Props) {
                     key={lesson.id}
                     lesson={lesson}
                     activeId={activeId}
-                    onSelect={onSelect}
                   />
                 ))}
               </div>

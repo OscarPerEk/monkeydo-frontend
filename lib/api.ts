@@ -1,5 +1,5 @@
 import type { SidebarData, LessonDetail, TargetWord } from "@/types/lesson";
-import type { GameStartRequest, GameFinishRequest } from "@/types/game";
+import type { GameStartRequest, GameFinishRequest, GameSessionSummary, WordHistoryOut } from "@/types/game";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -43,3 +43,19 @@ export const createLesson = (body: {
   folder_id?: string;
 }): Promise<LessonDetail> =>
   apiFetch("/lessons", { method: "POST", body: JSON.stringify(body) });
+
+export const getLessonSessions = (lessonId: string): Promise<GameSessionSummary[]> =>
+  apiFetch(`/lessons/${lessonId}/sessions`);
+
+export const getSessionHistory = (sessionId: string): Promise<WordHistoryOut[]> =>
+  apiFetch(`/games/${sessionId}/history`);
+
+export const updateLessonRange = (
+  lessonId: string,
+  startIndex: number | null,
+  endIndex: number | null,
+): Promise<LessonDetail> =>
+  apiFetch(`/lessons/${lessonId}/range`, {
+    method: "PATCH",
+    body: JSON.stringify({ start_index: startIndex, end_index: endIndex }),
+  });

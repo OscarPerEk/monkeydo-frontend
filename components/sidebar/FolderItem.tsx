@@ -7,10 +7,9 @@ import LessonItem from "./LessonItem";
 interface Props {
   folder: FolderOut;
   activeId: string | null;
-  onSelect: (id: string) => void;
 }
 
-export default function FolderItem({ folder, activeId, onSelect }: Props) {
+export default function FolderItem({ folder, activeId }: Props) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -29,7 +28,6 @@ export default function FolderItem({ folder, activeId, onSelect }: Props) {
               key={lesson.id}
               lesson={lesson}
               activeId={activeId}
-              onSelect={onSelect}
             />
           ))}
         </div>

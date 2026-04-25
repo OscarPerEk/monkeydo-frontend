@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { generateLesson, createLesson, type GenerateResponse } from "@/lib/api";
 import type { TargetWord } from "@/types/lesson";
 
-interface Props {
-  onSaved: (lessonId: string) => void;
-}
-
 const ESTIMATED_SECONDS = 40;
 
-export default function CreatePanel({ onSaved }: Props) {
+export default function CreatePanel() {
+  const router = useRouter();
   const [germanText, setGermanText] = useState("");
   const [prompt, setPrompt] = useState("");
   const [preview, setPreview] = useState<GenerateResponse | null>(null);
@@ -88,7 +86,8 @@ export default function CreatePanel({ onSaved }: Props) {
         target_data: preview.target_data,
       });
       console.log("[CreatePanel] Saved:", lesson.id);
-      onSaved(lesson.id);
+      router.push(`/lessons/${lesson.id}`);
+      router.refresh();
     } catch (e) {
       console.error("[CreatePanel] Save failed:", e);
       setError(e instanceof Error ? e.message : "Save failed");
