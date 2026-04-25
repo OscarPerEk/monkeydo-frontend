@@ -148,9 +148,7 @@ export default function InputBox({
         spellCheck={false}
         className={`bg-transparent border-b-2 outline-none text-white text-base w-48 pb-0.5 text-center transition-colors ${borderColor} placeholder-zinc-700 ${disabled ? "opacity-30" : ""}`}
       />
-      {hint && (
-        <span className="text-zinc-500 text-sm">{hint}</span>
-      )}
+      <span className={`text-sm ${hint ? "text-zinc-500" : "invisible"}`}>{hint || "\u00A0"}</span>
     </div>
   );
 }
