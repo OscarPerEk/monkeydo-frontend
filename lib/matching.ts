@@ -1,14 +1,18 @@
 import type { TargetWord } from "@/types/lesson";
 
 /**
- * Returns the length of the shared prefix between two strings (case-insensitive).
+ * Counts how many characters match at each position (case-insensitive).
+ * Only compares up to the shorter string's length.
  */
-function sharedPrefixLength(a: string, b: string): number {
+function correctCharCount(a: string, b: string): number {
   const al = a.toLowerCase();
   const bl = b.toLowerCase();
-  let i = 0;
-  while (i < al.length && i < bl.length && al[i] === bl[i]) i++;
-  return i;
+  const len = Math.min(al.length, bl.length);
+  let count = 0;
+  for (let i = 0; i < len; i++) {
+    if (al[i] === bl[i]) count++;
+  }
+  return count;
 }
 
 export interface MatchResult {
@@ -23,8 +27,8 @@ export interface MatchResult {
  *
  * Matching rules:
  * - Exact match (case-insensitive): green
- * - Shared prefix covers ≥50% of the target word: yellow
- * - Best coverage wins, leftmost on tie
+ * - ≥50% of characters correct at their position: yellow
+ * - Most correct characters wins, leftmost on tie
  */
 export function findBestMatch(
   input: string,
@@ -37,18 +41,36 @@ export function findBestMatch(
     }
   }
 
-  // Partial match: shared prefix must cover ≥50% of target word
+  // Partial match: correct characters at each position must cover ≥50% of target word
   let best: MatchResult | null = null;
-  let bestRatio = 0;
+  let bestCount = 0;
 
   for (const word of unguessed) {
-    const prefixLen = sharedPrefixLength(input, word.word);
-    const ratio = prefixLen / word.word.length;
-    if (ratio >= 0.5 && ratio > bestRatio) {
+    const count = correctCharCount(input, word.word);
+    const threshold = Math.ceil(word.word.length / 2);
+    if (count >= threshold && count > bestCount) {
       best = { word, exact: false };
-      bestRatio = ratio;
+      bestCount = count;
     }
   }
 
   return best;
+}
+
+/**
+ * Checks whether the partial input (still being typed) could plausibly match
+ * any unguessed word. Returns true if at least one word has ≥50% correct
+ * characters at the positions typed so far.
+ */
+export function hasViableMatch(
+  input: string,
+  unguessed: TargetWord[]
+): boolean {
+  if (!input) return true;
+  for (const word of unguessed) {
+    const count = correctCharCount(input, word.word);
+    const threshold = Math.ceil(input.length / 2);
+    if (count >= threshold) return true;
+  }
+  return false;
 }

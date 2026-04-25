@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getLesson, startGame, finishGame } from "@/lib/api";
-import { findBestMatch } from "@/lib/matching";
+import { findBestMatch, hasViableMatch } from "@/lib/matching";
 import type { LessonDetail, TargetWord } from "@/types/lesson";
 import type { GameState, SlotState, WordHistoryEntry } from "@/types/game";
 import InputBox from "./InputBox";
@@ -228,6 +228,14 @@ export default function EnginePanel({ lessonId }: Props) {
     }
   }, [lesson, gameState, unguessed, wrongAttempts, difficulty]);
 
+  const checkPartial = useCallback(
+    (input: string): boolean => {
+      if (gameState !== "playing") return true;
+      return hasViableMatch(input, unguessed);
+    },
+    [gameState, unguessed]
+  );
+
   const handleFinish = useCallback(async () => {
     if (gameState === "finished") return;
     setGameState("finished");
@@ -324,6 +332,7 @@ export default function EnginePanel({ lessonId }: Props) {
             onRequestHint={() => {}}
             onSkipPause={() => {}}
             onFirstKey={handleFirstKey}
+            checkPartial={() => true}
             started={false}
             disabled={false}
             hint={null}
@@ -337,6 +346,7 @@ export default function EnginePanel({ lessonId }: Props) {
           onRequestHint={handleRequestHint}
           onSkipPause={advanceToNextSentence}
           onFirstKey={() => {}}
+          checkPartial={checkPartial}
           started={true}
           disabled={sentencePause}
           hint={getHint(unguessed[0], difficulty, wrongAttempts)}

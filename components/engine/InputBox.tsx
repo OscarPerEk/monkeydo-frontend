@@ -9,6 +9,7 @@ interface Props {
   onRequestHint: () => void;
   onSkipPause: () => void; // skip the 3s pause between sentences
   onFirstKey: (char: string) => void;
+  checkPartial: (input: string) => boolean; // returns false if no viable match
   started: boolean;
   disabled: boolean; // true during sentence pause
   hint: string | null;
@@ -21,17 +22,26 @@ export default function InputBox({
   onRequestHint,
   onSkipPause,
   onFirstKey,
+  checkPartial,
   started,
   disabled,
   hint,
 }: Props) {
   const [value, setValue] = useState("");
   const [flash, setFlash] = useState<"red" | null>(null);
+  const [frozen, setFrozen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const frozenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, [disabled]);
+
+  useEffect(() => {
+    return () => {
+      if (frozenTimeoutRef.current) clearTimeout(frozenTimeoutRef.current);
+    };
+  }, []);
 
   const triggerRed = () => {
     setFlash("red");
@@ -39,6 +49,11 @@ export default function InputBox({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (frozen) {
+      e.preventDefault();
+      return;
+    }
+
     // Any key during pause → skip to next sentence
     if (disabled) {
       e.preventDefault();
@@ -94,11 +109,25 @@ export default function InputBox({
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (frozen) return;
     const newVal = e.target.value;
     if (!started && newVal.trim()) {
       onFirstKey(newVal.trim());
     }
     setValue(newVal);
+
+    // Real-time feedback: if no viable match → wrong attempt + 0.5s freeze
+    if (started && newVal.trim() && !checkPartial(newVal.trim())) {
+      onSubmit(newVal.trim());
+      setValue("");
+      setFlash("red");
+      setFrozen(true);
+      frozenTimeoutRef.current = setTimeout(() => {
+        setFlash(null);
+        setFrozen(false);
+        inputRef.current?.focus();
+      }, 500);
+    }
   };
 
   const borderColor = flash === "red" ? "border-red-500" : "border-zinc-700 focus:border-zinc-500";
