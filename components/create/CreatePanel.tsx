@@ -156,14 +156,6 @@ export default function CreatePanel() {
             />
           </div>
 
-          {/* English translation */}
-          <div className="flex flex-col gap-2">
-            <label className="text-zinc-500 text-sm">English (source)</label>
-            <p className="text-zinc-300 text-sm leading-relaxed bg-zinc-900 rounded-lg p-3 border border-zinc-800">
-              {preview.text_source}
-            </p>
-          </div>
-
           {/* German words — clickable to toggle excluded */}
           <div className="flex flex-col gap-2">
             <label className="text-zinc-500 text-sm">
